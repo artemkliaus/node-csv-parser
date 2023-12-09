@@ -1,56 +1,85 @@
-const http = require('http');
+const express = require('express');
+const fs = require('fs');
+const { parse } = require('csv-parse');
+const app = express();
+const db = {
+    movies: [],
+    isFilled: false,
+};
 
-const server = http.createServer();
-const pages = ['', 'about', 'movies'];
-server.on('request', (req, res) => {
-    const { url } = req;
-    const urlLevels = url.split('/');
+app.use((req, res, next) => {
+    console.log('This is middleware!');
+    next();
+});
 
-    if (pages.includes(url)) {
-        res.writeHead(200, {
-            'Content-Type': 'text/html',
+app.get('/', (req, res) => {
+    res.send('<h1>The main page</h1>');
+});
+
+app.get('/about', (req, res) => {
+    res.send('<h1>The about page</h1>');
+});
+
+app.get('/movies', (req, res) => {
+
+    fs.createReadStream('./csv/IMDBMovieData.csv')
+        .pipe(parse())
+        .on('data', setMovies)
+        .on('end', () => {
+            if (!db.isFilled) {
+                db.isFilled = true;
+            }
+
+            const list = db.movies.map((movie) => `<li>${movie[1]}</li>`);
+            res.send(`
+                <h1>The movies page</h1>
+                <ol>${list.join('')}</ol>
+            `);
         });
-    }
+});
 
-    if (urlLevels[1] === pages[0]) {
-        res.write('<h1>The main page</h1>');
-        res.end();
-    } else if (urlLevels[1] === pages[1]) {
-        res.write('<h1>The about page</h1>');
-        res.end();
-    } else if (urlLevels[1] === pages[2]) {
-        const { parse } = require('csv-parse');
-        const fs = require('fs');
-        const movies = [];
+app.get('/movies/:movieId', (req, res) => {
+    const { movieId } = req.params;
 
-        fs.createReadStream('./csv/IMDBMovieData.csv')
-            .pipe(parse())
-            .on('data', (data) => {
-                if (!isNaN(parseInt(data[0], 10))) {
-                    movies.push(data[1]);
-                }
-            })
-            .on('end', function () {
-                if (urlLevels.length === 3) {
-                    const position = Number(urlLevels[2]) + 1;
-                    res.write(`<h1>The ${position} movie page</h1>`);
-                    res.write(movies[urlLevels[2]]);
-                } else {
-                    res.write('<h1>The movies page</h1>');
-                    res.write(JSON.stringify(movies));
-                }
-                res.end();
-            });
-    } else {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'text/html');
-        res.write('<h1>The 404 page</h1>');
-        res.end();
-    }
+    fs.createReadStream('./csv/IMDBMovieData.csv')
+        .pipe(parse())
+        .on('data', setMovies)
+        .on('end', function () {
+            const movie = db.movies[movieId - 1];
+            let html;
 
+            if (!db.isFilled) {
+                db.isFilled = true;
+            }
+
+            if (movie) {
+                const [position, name, janre, descr] = movie;
+                html = `
+                    <h1>The movie page</h1>
+                    <h3>name: ${name}</h3>
+                    <div>position: ${position}</div>
+                    <div>janre: ${janre}</div>
+                    <div>descr: ${descr}</div>
+                `;
+                res.send(html);
+            } else {
+                html = '<h1>The movie does not exist</h1>';
+                res.status(404).send(html);
+            }
+        });
+});
+
+app.get('*', (req, res) => {
+    res.send('<h1>The 404 page</h1>');
 });
 
 const PORT = 4000;
-server.listen(PORT, () => {
-    console.log(`Start to listening to port ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`Start to listening the port ${PORT}`);
 });
+
+function setMovies(data) {
+    if (!db.isFilled && !isNaN(parseInt(data[0], 10))) {
+        db.movies.push(data);
+    }
+}
