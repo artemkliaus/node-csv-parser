@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
 const app = express();
 const PORT = 4000;
 
@@ -12,12 +13,15 @@ const {
     getNotFound,
 } = require('./src/controllers');
 
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'src', 'views'));
 app.use((req, res, next) => {
     fs.appendFile('./src/assets/site.log', req.url + ',', function (err) {
         if (err) throw err;
     });
     next();
 });
+app.use('/', express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 app.get('/', getMain);

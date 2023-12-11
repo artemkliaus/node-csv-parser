@@ -1,5 +1,7 @@
+const path = require('path');
+
 function getMain(req, res) {
-    res.send('<h1>The main page</h1>');
+    res.render('partials/layout/layout.ejs');
 }
 
 module.exports = {
